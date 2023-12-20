@@ -1,5 +1,8 @@
 local M = {}
 
+-- Split a string and return a table containing each elements.
+-- @param inputstr A string to be split.
+-- @param sep A separator char.
 function M.split_string(inputstr, sep)
   if sep == nil then
     sep = "%s"
@@ -14,6 +17,8 @@ function M.split_string(inputstr, sep)
   return t, cnt
 end
 
+-- Show the result of command on a floating terminal.
+-- @param cmd Command in string.
 function M.create_floating_term(cmd)
   local columns = vim.api.nvim_get_option("columns")
   local lines = vim.api.nvim_get_option("lines")
@@ -32,11 +37,11 @@ function M.create_floating_term(cmd)
     width = width,
     height = height,
     border = "single",
-    style = "minimal"
+    style = "minimal",
   })
 
   -- vim.api.nvim_buf_set_option(buf, 'buftype', 'terminal')
-  vim.api.nvim_buf_set_option(buf, 'buftype', 'quickfix')
+  vim.api.nvim_buf_set_option(buf, "buftype", "quickfix")
   vim.fn.termopen(cmd)
 
   local function on_exit(_, _)
@@ -46,11 +51,12 @@ function M.create_floating_term(cmd)
   --local job_id = vim.api.nvim_buf_get_option(buf, 'terminal_job_id')
   --vim.fn.jobwait({ job_id })
   vim.api.nvim_buf_attach(buf, false, {
-    on_detach = on_exit
+    on_detach = on_exit,
   })
 end
 
-function M.pretty_print(obj)
+-- Print in a pretty format.
+function M.my_pretty_print(obj)
   local tmp = {}
   if type(obj) == "table" then
     for i, j in pairs(obj) do
@@ -62,13 +68,38 @@ function M.pretty_print(obj)
   end
 end
 
-function M.get_fn_name()
-  -- TODO(yasufum): fix dummy
-  local tnode = vim.treesitter.get_node_at_cursor(0)
-  M.pretty_print(tnode)
-  return "TestContoller", "test_create_without_name_and_description"
+-- Get class and function name the cursor on.
+function M.get_cls_fn_name()
+  local ts_utils = require("nvim-treesitter.ts_utils")
+
+  local function _hoge(cls)
+    local current_node = ts_utils.get_node_at_cursor()
+    if not current_node then
+      return ""
+    end
+
+    local expr = current_node
+    while expr do
+      if expr:type() == (cls .. "_definition") then
+        break
+      end
+      expr = expr:parent()
+    end
+
+    if not expr then
+      return ""
+    end
+
+    return (ts_utils.get_node_text(expr:child(1)))[1]
+  end
+
+  class_name = _hoge("class")
+  func_name = _hoge("function")
+  return class_name, func_name
 end
 
+-- Get a test path to be given as an argument of tox.
+-- For example, `path.to.test.TestClass.test_method`.
 function M.get_test_path()
   local tpath = ""
   local full_path, _ = M.split_string(vim.fn.expand("%:p"), "/")
@@ -77,7 +108,7 @@ function M.get_test_path()
 
   --  It's expected "${PROJ}/tests/unit" is found.
   for i = 1, #full_path do
-    idx = (#full_path) - i
+    idx = #full_path - i
 
     if full_path[idx] == "tests" and full_path[idx + 1] == "unit" then
       break
@@ -90,22 +121,29 @@ function M.get_test_path()
 
   if idx > 1 then
     local t_root_idx = idx - 1
-    local f_dir_idx = (#full_path) - 2
+    local f_dir_idx = #full_path - 1
 
     for i = t_root_idx, f_dir_idx do
-      print(i, full_path[i])
+      -- print(i, full_path[i])
       table.insert(res, full_path[i])
     end
-    local tmp, _ = M.split_string(vim.fn.expand("%:r"), "/")
+
+    local tmp, _cnt = M.split_string(vim.fn.expand("%:r"), "/")
     table.insert(res, tmp[#tmp])
 
-    local cls, fn = M.get_fn_name()
-    table.insert(res, cls)
-    table.insert(res, fn)
+    local cls, fn = M.get_cls_fn_name()
+    if cls ~= "" then
+      table.insert(res, cls)
+      if fn ~= "" then
+        table.insert(res, fn)
+      end
+    end
     return table.concat(res, ".")
   end
 end
 
+-- Get a path from test path to open definition.
+-- @param s A test path.
 function M.get_test_file_path(s)
   -- Confirm the number of args is 1.
   local _, sizeof_args = M.split_string(s, " ")
@@ -146,10 +184,10 @@ function M.get_test_file_path(s)
   local opened_fdir, cnt = M.split_string(vim.fn.expand("%:p"), "/")
   -- `expand("%:p")` returns empty list if no file opened.
   if cnt == 0 then
-    opened_fdir, cnt = M.split_string(vim.fn.getcwd(), '/')
+    opened_fdir, cnt = M.split_string(vim.fn.getcwd(), "/")
   end
 
-  local f_ext = '.py'
+  local f_ext = ".py"
   for i = 1, #opened_fdir do
     local l = {}
     for j = 1, #opened_fdir - i + 1 do
@@ -159,7 +197,7 @@ function M.get_test_file_path(s)
       table.insert(l, path[k])
     end
 
-    local fpath = '/' .. table.concat(l, '/')
+    local fpath = "/" .. table.concat(l, "/")
     if io.open(fpath .. f_ext) and vim.fn.filereadable(fpath .. f_ext) == 1 then
       return { path = fpath .. f_ext, class = name_cls_fun[1], fun = name_cls_fun[2] }
     elseif io.open(fpath) and vim.fn.isdirectory(fpath) == 1 then
