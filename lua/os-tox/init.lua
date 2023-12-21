@@ -22,10 +22,25 @@ function M.open_definition(opts)
 end
 
 function M.run_tox_test()
+	M.run_tox("test")
+end
+
+function M.run_tox_debug()
+	M.run_tox("debug")
+end
+
+function M.run_tox(args)
 	local r = utils.get_test_path()
-	utils.my_pretty_print(r)
-	local cmd = "tox -e " .. py .. " -- " .. r
-	utils.create_floating_term(cmd)
+	local cmd = ""
+	-- utils.my_pretty_print(r)
+
+	if args == "test" then
+		cmd = "tox -e " .. py .. " -- " .. r
+	elseif args == "debug" then
+		cmd = "tox -e debug -- " .. r
+	end
+	print(cmd)
+	-- utils.create_floating_term(cmd)
 end
 
 function M.setup()
@@ -37,6 +52,11 @@ function M.setup()
 	create_cmd("OsRunTest", M.run_tox_test, {
 		nargs = 0,
 		desc = "Run tox test",
+	})
+
+	create_cmd("OsRunDebug", M.run_tox_debug, {
+		nargs = 0,
+		desc = "Run tox debug",
 	})
 end
 
