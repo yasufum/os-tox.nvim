@@ -40,7 +40,7 @@ function M.run_tox(args)
 		cmd = "tox -e debug -- " .. r
 	end
 	print(cmd)
-	-- utils.create_floating_term(cmd)
+	utils.create_floating_term(cmd)
 end
 
 function M.setup()
